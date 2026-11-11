@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Sort 9 管理ダッシュボード</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #0b1020; font-family: 'M PLUS Rounded 1c', sans-serif; color: #e8ecff; }
+  .num { font-family: 'Orbitron', sans-serif; }
+  .bg-grid { background-image: radial-gradient(circle at 50% 0%, rgba(99,102,241,.25), transparent 60%),
+             linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+             linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+             background-size: 100% 100%, 28px 28px, 28px 28px; min-height: 100vh; }
+  .card { border-radius: 1rem; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); padding: 1rem; }
+  .bar { background: linear-gradient(to top, #6366f1, #38bdf8); border-radius: 4px 4px 0 0; min-height: 2px; }
+  .hbar { background: linear-gradient(to right, #6366f1, #34d399); border-radius: 4px; height: 100%; }
+</style>
+</head>
+<!-- 管理者用ダッシュボード（パスワードなし）。Firestore の sort9_rankings を読むだけで、書き込みはしない。 -->
+<body class="bg-grid">
+<div class="max-w-5xl mx-auto px-4 py-6 flex flex-col gap-4">
+
+  <header class="flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <div class="text-xs tracking-[.35em] text-indigo-300 font-bold">INDIE SHORTS ADMIN</div>
+      <h1 class="num text-3xl font-black bg-gradient-to-br from-indigo-300 via-sky-300 to-emerald-300 bg-clip-text text-transparent">SORT 9 DASHBOARD</h1>
+      <div id="status" class="text-xs text-slate-400 mt-1">読み込み中…</div>
+    </div>
+    <div class="flex gap-2">
+      <button id="btn-more" class="hidden rounded-xl px-4 py-2 text-sm font-bold bg-white/10 border border-white/15 hover:bg-white/15">
+        <i class="fa-solid fa-angles-down mr-1"></i>さらに読み込む
+      </button>
+      <button id="btn-reload" class="rounded-xl px-4 py-2 text-sm font-bold bg-gradient-to-r from-indigo-500 to-sky-500">
+        <i class="fa-solid fa-rotate mr-1"></i>再読み込み
+      </button>
+    </div>
+  </header>
+
+  <!-- KPI -->
+  <section class="grid grid-cols-2 md:grid-cols-4 gap-3" id="kpis"></section>
+
+  <!-- 日別推移 -->
+  <section class="card">
+    <div class="flex justify-between items-baseline mb-3">
+      <h2 class="font-bold text-indigo-200"><i class="fa-solid fa-chart-column mr-1"></i>日別の登録数（直近30日）</h2>
+      <span class="text-[11px] text-slate-400">棒にカーソルで件数・最高点</span>
+    </div>
+    <div id="daily" class="flex items-end gap-[3px] h-40"></div>
+    <div id="daily-axis" class="flex justify-between text-[10px] text-slate-500 mt-1"></div>
+  </section>
+
+  <div class="grid md:grid-cols-2 gap-4">
+    <!-- スコア分布 -->
+    <section class="card">
+      <h2 class="font-bold text-indigo-200 mb-3"><i class="fa-solid fa-chart-simple mr-1"></i>スコア分布</h2>
+      <div id="dist" class="flex flex-col gap-1.5 text-xs"></div>
+    </section>
+    <!-- レベル分布 -->
+    <section class="card">
+      <h2 class="font-bold text-indigo-200 mb-3"><i class="fa-solid fa-layer-group mr-1"></i>到達レベル分布</h2>
+      <div id="levels" class="flex flex-col gap-1.5 text-xs"></div>
+    </section>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-4">
+    <!-- 上位ランキング -->
+    <section class="card">
+      <h2 class="font-bold text-indigo-200 mb-3"><i class="fa-solid fa-trophy mr-1"></i>上位ランキング TOP20</h2>
+      <ol id="top" class="flex flex-col gap-1 text-sm"></ol>
+    </section>
+    <!-- 最近のプレイ -->
+    <section class="card">
+      <h2 class="font-bold text-indigo-200 mb-3"><i class="fa-solid fa-clock-rotate-left mr-1"></i>最近のプレイ</h2>
+      <ol id="recent" class="flex flex-col gap-1 text-sm"></ol>
+    </section>
+  </div>
+
+  <!-- プレイヤー別 -->
+  <section class="card">
+    <h2 class="font-bold text-indigo-200 mb-3"><i class="fa-solid fa-users mr-1"></i>よく遊んでいるプレイヤー（名前別）</h2>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-[11px] text-slate-400 text-left">
+          <tr><th class="py-1 pr-2">名前</th><th class="py-1 pr-2 text-right">登録数</th><th class="py-1 pr-2 text-right">最高点</th><th class="py-1 pr-2 text-right">平均点</th><th class="py-1 text-right">最終プレイ</th></tr>
+        </thead>
+        <tbody id="players"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="text-[11px] text-slate-500 leading-relaxed">
+    ※ データは Firestore の <code>sort9_rankings</code>（0点より大きいスコアでオンライン登録されたプレイのみ）。0点のプレイや通信に失敗したプレイは含まれません。<br>
+    ※ セキュリティルールにより1回の取得は50件まで。新しい順に50件ずつ取得し、最初は最大 <span id="cap"></span> 件まで読み込みます（読み取り件数＝Firestoreの課金対象）。<br>
+    ※ このページにはパスワードがありません。URLを知っている人は誰でも閲覧できます。
+  </p>
+</div>
+
+<script type="module">
+// index.html と同じ Firebase 設定
+const firebaseConfig = {
+  apiKey: 'AIzaSyCL8QoW18MeVpcx96B-PhRp17NM_krAam0',
+  authDomain: 'sort9-6e880.firebaseapp.com',
+  projectId: 'sort9-6e880',
+  storageBucket: 'sort9-6e880.firebasestorage.app',
+  messagingSenderId: '36558741048',
+  appId: '1:36558741048:web:b264212dc7cc87956310cd',
+  measurementId: 'G-KZG3RXXTFH',
+};
+const PAGE = 50;          // ルール上限（request.query.limit <= 50）
+const PAGES_PER_LOAD = 20; // 1回の読み込みで最大 1,000 件
+
+const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+const { getFirestore, collection, query, orderBy, limit, startAfter, getDocs } =
+  await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+const db = getFirestore(initializeApp(firebaseConfig));
+const col = collection(db, 'sort9_rankings');
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const fmt = n => Number(n).toLocaleString('ja-JP');
+const pad = n => String(n).padStart(2, '0');
+const dayKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const fmtTime = d => d ? `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}` : '—';
+$('cap').textContent = fmt(PAGE * PAGES_PER_LOAD);
+
+let rows = [], cursor = null, done = false, loading = false;
+
+async function loadMore() {
+  if (loading || done) return;
+  loading = true;
+  $('btn-more').classList.add('hidden');
+  try {
+    for (let i = 0; i < PAGES_PER_LOAD; i++) {
+      $('status').textContent = `読み込み中… ${fmt(rows.length)} 件`;
+      const q = cursor
+        ? query(col, orderBy('timestamp', 'desc'), startAfter(cursor), limit(PAGE))
+        : query(col, orderBy('timestamp', 'desc'), limit(PAGE));
+      const snap = await getDocs(q);
+      snap.docs.forEach(d => {
+        const v = d.data();
+        rows.push({ id: d.id, name: v.name ?? '', score: v.score ?? 0, level: v.level ?? 0,
+                    at: v.timestamp?.toDate ? v.timestamp.toDate() : null });
+      });
+      if (snap.docs.length) cursor = snap.docs[snap.docs.length - 1];
+      if (snap.docs.length < PAGE) { done = true; break; }
+    }
+    const now = new Date();
+    $('status').textContent = `${fmt(rows.length)} 件を読み込み${done ? '（全件）' : '（続きあり）'} ・ 更新 ${fmtTime(now)}`;
+    if (!done) $('btn-more').classList.remove('hidden');
+    render();
+  } catch (e) {
+    console.error(e);
+    $('status').innerHTML = `<span class="text-red-400">読み込みに失敗しました: ${esc(e.code || e.message)}</span>`;
+  } finally { loading = false; }
+}
+
+function reload() { rows = []; cursor = null; done = false; loadMore(); }
+
+function kpi(label, value, sub = '', icon = 'fa-chart-line') {
+  return `<div class="card"><div class="text-[11px] text-slate-400"><i class="fa-solid ${icon} mr-1"></i>${label}</div>
+    <div class="num text-2xl text-emerald-300 mt-1">${value}</div><div class="text-[11px] text-slate-500 mt-0.5">${sub}</div></div>`;
+}
+
+function hbars(el, items) { // items: [{label, count}]
+  const max = Math.max(1, ...items.map(i => i.count));
+  el.innerHTML = items.map(i => `
+    <div class="flex items-center gap-2">
+      <span class="w-24 text-slate-300 shrink-0 text-right">${i.label}</span>
+      <div class="flex-1 h-4 bg-white/5 rounded"><div class="hbar" style="width:${(i.count / max) * 100}%"></div></div>
+      <span class="num w-10 text-right text-slate-300">${fmt(i.count)}</span>
+    </div>`).join('') || '<div class="text-slate-500">データなし</div>';
+}
+
+function render() {
+  const n = rows.length;
+  const scores = rows.map(r => r.score);
+  const sorted = [...scores].sort((a, b) => a - b);
+  const avg = n ? scores.reduce((a, b) => a + b, 0) / n : 0;
+  const median = n ? (n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2) : 0;
+  const best = n ? sorted[n - 1] : 0;
+  const names = new Set(rows.map(r => r.name));
+  const today = dayKey(new Date());
+  const todayCount = rows.filter(r => r.at && dayKey(r.at) === today).length;
+  const weekAgo = Date.now() - 7 * 864e5;
+  const weekCount = rows.filter(r => r.at && r.at.getTime() >= weekAgo).length;
+
+  $('kpis').innerHTML =
+    kpi('総プレイ数（登録数）', fmt(n) + (done ? '' : '+'), `今日 ${fmt(todayCount)} ／ 7日間 ${fmt(weekCount)}`, 'fa-gamepad') +
+    kpi('プレイヤー数（名前）', fmt(names.size), 'ユニークな名前の数', 'fa-users') +
+    kpi('最高スコア', fmt(best), n ? esc(rows.find(r => r.score === best).name) : '—', 'fa-crown') +
+    kpi('平均 ／ 中央値', `${fmt(Math.round(avg))}`, `中央値 ${fmt(Math.round(median))}`, 'fa-scale-balanced');
+
+  // 日別（直近30日）
+  const days = [];
+  for (let i = 29; i >= 0; i--) { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i); days.push(d); }
+  const byDay = {};
+  rows.forEach(r => { if (!r.at) return; const k = dayKey(r.at); (byDay[k] ||= { c: 0, best: 0 }); byDay[k].c++; byDay[k].best = Math.max(byDay[k].best, r.score); });
+  const dmax = Math.max(1, ...days.map(d => byDay[dayKey(d)]?.c || 0));
+  $('daily').innerHTML = days.map(d => {
+    const v = byDay[dayKey(d)] || { c: 0, best: 0 };
+    return `<div class="flex-1 h-full flex flex-col justify-end" title="${d.getMonth() + 1}/${d.getDate()}：${v.c}件（最高 ${v.best}点）">
+      <div class="text-[9px] text-center text-slate-400 leading-none mb-0.5">${v.c || ''}</div>
+      <div class="bar" style="height:${(v.c / dmax) * 85}%"></div></div>`;
+  }).join('');
+  const lbl = d => `${d.getMonth() + 1}/${d.getDate()}`;
+  $('daily-axis').innerHTML = `<span>${lbl(days[0])}</span><span>${lbl(days[15])}</span><span>今日</span>`;
+
+  // スコア分布（最高点に合わせて幅を決める）
+  const step = best <= 500 ? 50 : best <= 2000 ? 250 : best <= 5000 ? 500 : 1000;
+  const bins = [];
+  for (let lo = 0; lo <= best; lo += step) bins.push({ label: `${fmt(lo)}–${fmt(lo + step - 1)}`, count: 0, lo });
+  rows.forEach(r => { const i = Math.floor(r.score / step); if (bins[i]) bins[i].count++; });
+  hbars($('dist'), bins);
+
+  // レベル分布
+  const lv = {};
+  rows.forEach(r => { lv[r.level] = (lv[r.level] || 0) + 1; });
+  hbars($('levels'), Object.keys(lv).map(Number).sort((a, b) => a - b).map(l => ({ label: `Lv.${l}`, count: lv[l] })));
+
+  // 上位ランキング
+  const medal = ['text-amber-300', 'text-slate-300', 'text-orange-400'];
+  const line = (left, r, right) => `
+    <li class="flex items-center gap-3 rounded-lg bg-white/5 px-3 py-1.5">
+      ${left}<span class="flex-1 truncate">${esc(r.name)}</span>
+      <span class="text-[10px] text-slate-400">Lv.${r.level}</span>
+      <span class="num text-emerald-300 w-14 text-right">${fmt(r.score)}</span>${right}
+    </li>`;
+  const top = [...rows].sort((a, b) => b.score - a.score || (a.at - b.at)).slice(0, 20);
+  $('top').innerHTML = top.map((r, i) => line(`<span class="num w-6 ${medal[i] || 'text-slate-500'}">${i + 1}</span>`, r,
+    `<span class="text-[10px] text-slate-500 w-20 whitespace-nowrap text-right">${fmtTime(r.at)}</span>`)).join('') || '<li class="text-slate-500">データなし</li>';
+
+  // 最近のプレイ
+  $('recent').innerHTML = rows.slice(0, 20).map(r => line(`<span class="text-[11px] text-slate-400 w-20 whitespace-nowrap">${fmtTime(r.at)}</span>`, r, ''))
+    .join('') || '<li class="text-slate-500">データなし</li>';
+
+  // プレイヤー別
+  const ps = {};
+  rows.forEach(r => {
+    const p = (ps[r.name] ||= { name: r.name, c: 0, best: 0, sum: 0, last: null });
+    p.c++; p.sum += r.score; p.best = Math.max(p.best, r.score);
+    if (r.at && (!p.last || r.at > p.last)) p.last = r.at;
+  });
+  $('players').innerHTML = Object.values(ps).sort((a, b) => b.c - a.c || b.best - a.best).slice(0, 20).map(p => `
+    <tr class="border-t border-white/5">
+      <td class="py-1.5 pr-2 truncate max-w-[10rem]">${esc(p.name)}</td>
+      <td class="py-1.5 pr-2 text-right num">${fmt(p.c)}</td>
+      <td class="py-1.5 pr-2 text-right num text-emerald-300">${fmt(p.best)}</td>
+      <td class="py-1.5 pr-2 text-right num">${fmt(Math.round(p.sum / p.c))}</td>
+      <td class="py-1.5 text-right text-slate-400 text-xs">${fmtTime(p.last)}</td>
+    </tr>`).join('') || '<tr><td class="text-slate-500 py-2">データなし</td></tr>';
+}
+
+$('btn-more').addEventListener('click', loadMore);
+$('btn-reload').addEventListener('click', reload);
+reload();
+</script>
+</body>
+</html>
