@@ -36,6 +36,11 @@
              background-size: 100% 100%, 28px 28px, 28px 28px; }
   .screen { display: none; }
   .screen.active { display: flex; }
+  /* タイトル・結果画面: 縦に収まるときは中央寄せ、収まらないときは上から並べてスクロールできるようにする */
+  #scr-title, #scr-result { justify-content: flex-start; overflow-y: auto; min-height: 0;
+                            padding-top: 16px; padding-bottom: 16px; overscroll-behavior: contain; }
+  #scr-title > :first-child, #scr-result > :first-child { margin-top: auto; }
+  #scr-title > :last-child, #scr-result > :last-child { margin-bottom: auto; }
   .cell { aspect-ratio: 1 / 1; border-radius: 14px; transition: transform .08s, background-color .15s, box-shadow .15s; }
   .cell:active { transform: scale(.94); }
   .cell.empty { background: rgba(255,255,255,.03); }
