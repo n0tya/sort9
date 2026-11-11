@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Sort 9（ソート・ナイン） - INDIE SHORTS</title>
+<meta name="description" content="一瞬だけ表示される数字を、消えたあと小さい順にタップ。あなたは何個覚えられる？60秒の瞬間記憶パズル。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://n0tya.github.io/sort9/">
+<meta property="og:title" content="Sort 9 ｜ 一瞬で消える数字、何個覚えられる？">
+<meta property="og:description" content="消えたマスを小さい順にタップ！60秒の瞬間記憶パズル。称号「人間メモリー」を目指せ。">
+<meta property="og:site_name" content="INDIE SHORTS">
+<meta property="og:image" content="https://n0tya.github.io/sort9/ogp.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="SORT 9 一瞬で消える数字、何個覚えられる？">
+<meta name="twitter:card" content="summary_large_image">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -112,6 +123,7 @@
       <div class="text-xs text-slate-400">SCORE</div>
       <div id="res-score" class="num text-6xl font-black text-emerald-300">0</div>
       <div id="res-new" class="text-amber-300 font-bold text-sm mt-1 hidden"><i class="fa-solid fa-star mr-1"></i>自己ベスト更新！</div>
+      <div id="res-title" class="mt-2 inline-block rounded-full bg-indigo-500/20 border border-indigo-300/40 px-3 py-1 text-sm font-extrabold text-indigo-100"></div>
       <div id="res-online" class="text-[11px] text-slate-400 mt-1 h-4"></div>
     </div>
     <div class="grid grid-cols-3 gap-2 w-full text-center">
@@ -477,12 +489,64 @@ function gameOver() {
   const emoji = emojiLine();
   $('res-emoji').textContent = emoji || '—';
 
-  const text = `【Sort 9】スコア ${S.score} ／ 最高Lv.${S.maxLevel} ／ 最大${S.maxCombo}コンボ\n${emoji}\n#INDIESHORTS #Sort9`;
+  const title = titleFor(S.maxLevel);
+  $('res-title').textContent = `${title.icon} ${title.name}`;
+  const text = buildShareText({ score: S.score, level: S.maxLevel, combo: S.maxCombo, acc, emoji, title });
   S.shareText = text;
   $('btn-share').href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text);
   $('copy-label').textContent = '結果をコピー';
 
   setTimeout(() => show('result'), 900);
+}
+
+/* ---------- シェア ---------- */
+const SHARE_URL = 'https://n0tya.github.io/sort9/';
+
+// 称号：到達レベル（＝覚えた数字の個数）で決まる
+function titleFor(lv) {
+  const T = [
+    [25, '👑', '人間メモリー'],
+    [18, '⚡', '瞬間記憶の使い手'],
+    [13, '🔥', '記憶の達人'],
+    [9,  '✨', 'なかなかの記憶力'],
+    [5,  '🌱', 'ふつうの記憶力'],
+    [1,  '🐣', '記憶のひよっこ'],
+  ];
+  const [, icon, name] = T.find(([min]) => lv >= min);
+  return { icon, name };
+}
+
+// X の文字数（日本語・絵文字は2、URLは23として数える）
+function xLength(s) {
+  const noUrl = s.replace(/https?:\/\/\S+/g, '');
+  const urls = (s.match(/https?:\/\/\S+/g) || []).length;
+  let n = urls * 23;
+  for (const ch of noUrl) n += ch.codePointAt(0) <= 0x10FF ? 1 : 2;
+  return n;
+}
+
+function buildShareText({ score, level, combo, acc, emoji, title }) {
+  // maxLevel は「到達」レベルなので、最後にクリアしたのは1つ前のレベル
+  const headline = level > 1
+    ? `🧠 一瞬で消える数字を${countFor(level - 1)}個記憶できた`
+    : `🧠 一瞬で消える数字に挑戦した`;
+  const make = grid => [
+    headline,
+    `称号${title.icon}「${title.name}」`,
+    ``,
+    `【Sort 9】${score}点`,
+    `Lv.${level}／最大${combo}コンボ／正解率${acc}%`,
+    ...(grid ? [grid] : []),
+    ``,
+    `あなたは何個いける？👇`,
+    SHARE_URL,
+    `#Sort9 #瞬間記憶 #INDIESHORTS`,
+  ].join('\n');
+  // 280 を超えるときはプレイ履歴を1行ずつ削る
+  let rows = emoji ? emoji.split('\n') : [];
+  let text = make(rows.join('\n'));
+  while (xLength(text) > 280 && rows.length) { rows = rows.slice(1); text = make(rows.join('\n')); }
+  return text;
 }
 
 // プレイ履歴を絵文字で（最大20ラウンド、10個ごとに改行）
