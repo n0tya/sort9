@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Sort 9（ソート・ナイン） - INDIE SHORTS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  html, body { height: 100%; margin: 0; overflow: hidden; background: #0b1020; }
+  body { font-family: 'M PLUS Rounded 1c', sans-serif; color: #e8ecff;
+         -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+         touch-action: manipulation; }
+  .num { font-family: 'Orbitron', sans-serif; }
+  .bg-grid { background-image: radial-gradient(circle at 50% 0%, rgba(99,102,241,.25), transparent 60%),
+             linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+             linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+             background-size: 100% 100%, 28px 28px, 28px 28px; }
+  .screen { display: none; }
+  .screen.active { display: flex; }
+  .cell { aspect-ratio: 1 / 1; border-radius: 14px; transition: transform .08s, background-color .15s, box-shadow .15s; }
+  .cell:active { transform: scale(.94); }
+  .cell.empty { background: rgba(255,255,255,.03); }
+  .cell.shown { background: #1e2a5a; box-shadow: inset 0 0 0 2px #6366f1, 0 0 18px rgba(99,102,241,.5); color: #fff; }
+  .cell.covered { background: linear-gradient(145deg,#334155,#1e293b); box-shadow: inset 0 0 0 2px #475569; }
+  .cell.ok { background: #065f46; box-shadow: inset 0 0 0 2px #34d399, 0 0 16px rgba(52,211,153,.55); color: #d1fae5; }
+  .cell.ng { background: #7f1d1d; box-shadow: inset 0 0 0 2px #f87171, 0 0 16px rgba(248,113,113,.6); color: #fee2e2; }
+  .cell.answer { background: #1f2937; box-shadow: inset 0 0 0 2px #fbbf24; color: #fde68a; }
+  .pop { animation: pop .18s ease-out; }
+  @keyframes pop { 0%{transform:scale(.8)} 100%{transform:scale(1)} }
+  .shake { animation: shake .3s; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+  .float { position: absolute; pointer-events: none; font-weight: 800; animation: floatUp .9s ease-out forwards; }
+  @keyframes floatUp { 0%{opacity:1; transform:translate(-50%,0)} 100%{opacity:0; transform:translate(-50%,-48px)} }
+  .countdown { animation: cd .9s ease-out; }
+  @keyframes cd { 0%{transform:scale(2.2); opacity:0} 30%{opacity:1} 100%{transform:scale(1); opacity:.9} }
+  .low-time { color: #f87171 !important; animation: blink .5s infinite alternate; }
+  @keyframes blink { to { opacity: .45; } }
+</style>
+</head>
+<body class="bg-grid">
+<div id="app" class="h-full w-full max-w-md mx-auto relative flex flex-col">
+
+  <!-- ===== タイトル画面 ===== -->
+  <section id="scr-title" class="screen active flex-col items-center justify-center h-full px-6 gap-5">
+    <div class="text-center">
+      <div class="text-xs tracking-[.35em] text-indigo-300 font-bold">INDIE SHORTS</div>
+      <h1 class="num text-6xl font-black mt-1 bg-gradient-to-br from-indigo-300 via-sky-300 to-emerald-300 bg-clip-text text-transparent">SORT 9</h1>
+      <div class="text-sm text-slate-300 mt-1">ソート・ナイン ｜ 瞬間記憶パズル</div>
+    </div>
+
+    <div class="w-full rounded-2xl bg-white/5 border border-white/10 p-4 text-sm leading-relaxed text-slate-200">
+      <div class="font-bold text-indigo-200 mb-1"><i class="fa-solid fa-circle-info mr-1"></i>あそびかた</div>
+      数字が一瞬だけ表示されて消えます。<br>
+      消えたマスを<b class="text-emerald-300">小さい順</b>にタップ！<br>
+      <span class="text-slate-400 text-xs">クリアで +1秒 ／ ミスで −2秒・コンボリセット ／ 表示中にタップすると即スタート</span>
+    </div>
+
+    <div class="w-full">
+      <label class="text-xs text-slate-400">プレイヤー名</label>
+      <input id="in-name" maxlength="12" placeholder="NO NAME"
+        class="w-full mt-1 rounded-xl bg-slate-900/80 border border-slate-600 px-4 py-3 text-lg outline-none focus:border-indigo-400" style="user-select:text">
+    </div>
+
+    <button id="btn-start" class="w-full rounded-2xl py-4 text-xl font-extrabold bg-gradient-to-r from-indigo-500 to-sky-500 shadow-lg shadow-indigo-900/60 active:scale-95 transition">
+      <i class="fa-solid fa-play mr-2"></i>START
+    </button>
+
+    <div class="w-full rounded-2xl bg-white/5 border border-white/10 p-4">
+      <div class="flex items-center justify-between mb-2">
+        <div class="font-bold text-amber-300 text-sm"><i class="fa-solid fa-crown mr-1"></i>ランキング TOP 5</div>
+        <div id="rank-src" class="text-[10px] text-slate-500">この端末の記録</div>
+      </div>
+      <ol id="rank-list" class="text-sm space-y-1"></ol>
+    </div>
+  </section>
+
+  <!-- ===== ゲーム画面 ===== -->
+  <section id="scr-game" class="screen flex-col h-full px-4 pt-4 pb-6">
+    <header class="grid grid-cols-4 gap-2 text-center">
+      <div class="rounded-xl bg-white/5 py-2"><div class="text-[10px] text-slate-400">TIME</div><div id="hud-time" class="num text-xl">60.0</div></div>
+      <div class="rounded-xl bg-white/5 py-2"><div class="text-[10px] text-slate-400">LEVEL</div><div id="hud-level" class="num text-xl">1</div></div>
+      <div class="rounded-xl bg-white/5 py-2"><div class="text-[10px] text-slate-400">COMBO</div><div id="hud-combo" class="num text-xl text-orange-300">0</div></div>
+      <div class="rounded-xl bg-white/5 py-2"><div class="text-[10px] text-slate-400">SCORE</div><div id="hud-score" class="num text-xl text-emerald-300">0</div></div>
+    </header>
+    <div class="h-1.5 rounded-full bg-white/10 mt-3 overflow-hidden"><div id="bar-time" class="h-full bg-gradient-to-r from-emerald-400 to-sky-400" style="width:100%"></div></div>
+
+    <div class="flex-1 flex flex-col justify-center">
+      <div id="msg" class="text-center h-8 font-extrabold text-lg text-indigo-200"></div>
+      <div class="h-1 rounded-full bg-white/5 mb-3 overflow-hidden"><div id="bar-memo" class="h-full bg-amber-300" style="width:0%"></div></div>
+      <div id="board" class="relative grid grid-cols-4 gap-2.5"></div>
+      <div id="sub" class="text-center text-xs text-slate-400 mt-3 h-4"></div>
+    </div>
+
+    <div id="cd-layer" class="absolute inset-0 hidden items-center justify-center bg-slate-950/60 z-20">
+      <div id="cd-num" class="num text-8xl font-black text-white"></div>
+    </div>
+
+    <div id="pause-layer" class="absolute inset-0 hidden flex-col items-center justify-center gap-3 bg-slate-950/85 z-30">
+      <div class="num text-4xl font-black text-white tracking-widest">PAUSE</div>
+      <div class="text-sm text-slate-300">タップで再開</div>
+      <div class="text-[11px] text-slate-500">覚える途中だった場合は、新しい問題から再開します</div>
+    </div>
+  </section>
+
+  <!-- ===== リザルト画面 ===== -->
+  <section id="scr-result" class="screen flex-col items-center justify-center h-full px-6 gap-4">
+    <div class="num text-3xl font-black text-rose-300 tracking-widest">TIME UP!</div>
+    <div class="text-center">
+      <div class="text-xs text-slate-400">SCORE</div>
+      <div id="res-score" class="num text-6xl font-black text-emerald-300">0</div>
+      <div id="res-new" class="text-amber-300 font-bold text-sm mt-1 hidden"><i class="fa-solid fa-star mr-1"></i>自己ベスト更新！</div>
+      <div id="res-online" class="text-[11px] text-slate-400 mt-1 h-4"></div>
+    </div>
+    <div class="grid grid-cols-3 gap-2 w-full text-center">
+      <div class="rounded-xl bg-white/5 py-2"><div class="text-[10px] text-slate-400">最高LEVEL</div><div id="res-level" class="num text-xl">1</div></div>
+      <div class="rounded-xl bg-white/5 py-2"><div class="text-[10px] text-slate-400">最大COMBO</div><div id="res-combo" class="num text-xl">0</div></div>
+      <div class="rounded-xl bg-white/5 py-2"><div class="text-[10px] text-slate-400">正解率</div><div id="res-acc" class="num text-xl">0%</div></div>
+    </div>
+    <div class="w-full rounded-2xl bg-white/5 border border-white/10 p-3 text-center">
+      <div class="text-[10px] text-slate-400 mb-1">プレイ履歴</div>
+      <div id="res-emoji" class="text-xl leading-snug break-all"></div>
+    </div>
+    <a id="btn-share" href="#" target="_blank" rel="noopener"
+       class="w-full text-center rounded-2xl py-3 font-extrabold bg-black border border-white/20 active:scale-95 transition">
+      <i class="fa-brands fa-x-twitter mr-2"></i>結果をポストする
+    </a>
+    <button id="btn-copy" class="w-full rounded-2xl py-3 font-bold bg-white/10 active:scale-95 transition">
+      <i class="fa-regular fa-copy mr-2"></i><span id="copy-label">結果をコピー</span>
+    </button>
+    <div class="grid grid-cols-2 gap-2 w-full">
+      <button id="btn-retry" class="rounded-2xl py-3 font-extrabold bg-gradient-to-r from-indigo-500 to-sky-500 active:scale-95 transition"><i class="fa-solid fa-rotate-right mr-1"></i>もう一回</button>
+      <button id="btn-home" class="rounded-2xl py-3 font-bold bg-white/10 active:scale-95 transition"><i class="fa-solid fa-house mr-1"></i>タイトル</button>
+    </div>
+  </section>
+</div>
+
+<script>
+/* =========================================================
+   Sort 9 - INDIE SHORTS
+   ========================================================= */
+const CONFIG = {
+  TIME_LIMIT: 60,      // 制限時間（秒）
+  TIME_CAP: 60,        // 回復の上限
+  CLEAR_BONUS_SEC: 1,  // クリア時の回復
+  MISS_PENALTY_SEC: 2, // ミス時のペナルティ
+  CELLS: 16,           // 4x4 盤面
+};
+
+/* ---------- レベル設計 ---------- */
+// Lv1-2:3個, Lv3-4:4個 … Lv13以降:9個
+const countFor = lv => Math.min(9, 3 + Math.floor((lv - 1) / 2));
+// 表示時間：個数に比例し、レベルごとに5%ずつ短縮（下限0.35秒）
+const memoMsFor = lv => Math.max(350, Math.round((500 + countFor(lv) * 150) * Math.pow(0.95, lv - 1)));
+
+/* ---------- サウンド (Web Audio API) ---------- */
+const Sound = {
+  ctx: null,
+  init() {
+    try {
+      if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+    } catch (e) { this.ctx = null; }
+  },
+  tone(freq, dur = 0.08, type = 'square', vol = 0.12, endFreq = null, delay = 0) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    if (endFreq) o.frequency.exponentialRampToValueAtTime(endFreq, t + dur);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(this.ctx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  },
+  tap(i)   { this.tone(520 + i * 70, 0.07, 'square', 0.09); },        // 正しく押すごとに音程が上がる
+  clear()  { [660, 880, 1320].forEach((f, i) => this.tone(f, 0.12, 'triangle', 0.14, null, i * 0.07)); },
+  error()  { this.tone(220, 0.3, 'sawtooth', 0.14, 90); },
+  count()  { this.tone(440, 0.12, 'sine', 0.18); },
+  go()     { this.tone(880, 0.25, 'sine', 0.2); },
+  tick()   { this.tone(1200, 0.03, 'square', 0.05); },
+  timeup() { [784, 587, 392].forEach((f, i) => this.tone(f, 0.22, 'triangle', 0.16, null, i * 0.16)); },
+};
+
+/* ---------- ランキング ----------
+   端末内（localStorage）には常に保存（自己ベスト判定用）。
+   Firebase 設定済みなら、下の <script type="module"> が window.OnlineRanking を用意し、
+   Firestore（sort9_rankings）にも登録・表示する。 */
+const Ranking = {
+  KEY: 'indieshorts_sort9_rankings',
+  load() {
+    try { return JSON.parse(localStorage.getItem(this.KEY)) || []; } catch (e) { return []; }
+  },
+  save(entry) {
+    const list = this.load();
+    list.push(entry);
+    list.sort((a, b) => b.score - a.score);
+    const top = list.slice(0, 5);
+    try { localStorage.setItem(this.KEY, JSON.stringify(top)); } catch (e) {}
+    return top;
+  },
+};
+const Store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+};
+
+/* ---------- DOM ---------- */
+const $ = id => document.getElementById(id);
+const el = {
+  board: $('board'), msg: $('msg'), sub: $('sub'),
+  time: $('hud-time'), level: $('hud-level'), combo: $('hud-combo'), score: $('hud-score'),
+  barTime: $('bar-time'), barMemo: $('bar-memo'),
+  cdLayer: $('cd-layer'), cdNum: $('cd-num'),
+};
+function show(screen) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $('scr-' + screen).classList.add('active');
+}
+
+/* ---------- 状態 ---------- */
+let S = {};
+let rafId = null, timeouts = [];
+const later = (fn, ms) => { const id = setTimeout(fn, ms); timeouts.push(id); return id; };
+const clearLater = () => { timeouts.forEach(clearTimeout); timeouts = []; };
+
+function resetState() {
+  S = {
+    phase: 'idle', time: CONFIG.TIME_LIMIT, score: 0, level: 1, maxLevel: 1,
+    combo: 0, maxCombo: 0, clears: 0, misses: 0, history: [],
+    cellNum: [], order: [], next: 0, lastFrame: 0, lastTickSec: null,
+    memoStart: 0, memoMs: 0,
+  };
+}
+
+/* ---------- 盤面 ---------- */
+function buildBoard() {
+  el.board.innerHTML = '';
+  for (let i = 0; i < CONFIG.CELLS; i++) {
+    const b = document.createElement('button');
+    b.className = 'cell empty num text-4xl font-black flex items-center justify-center';
+    b.dataset.i = i;
+    b.addEventListener('pointerdown', e => { e.preventDefault(); onCell(i, b); });
+    el.board.appendChild(b);
+  }
+}
+const cellEl = i => el.board.children[i];
+
+function setCell(i, state, text = '') {
+  const c = cellEl(i);
+  c.className = 'cell num text-4xl font-black flex items-center justify-center ' + state;
+  c.textContent = text;
+}
+
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+/* ---------- ラウンド ---------- */
+function startRound() {
+  if (S.phase === 'over') return;
+  const count = countFor(S.level);
+  const nums = shuffle([1,2,3,4,5,6,7,8,9]).slice(0, count);
+  const pos = shuffle([...Array(CONFIG.CELLS).keys()]).slice(0, count);
+  S.cellNum = Array(CONFIG.CELLS).fill(0);
+  pos.forEach((p, k) => S.cellNum[p] = nums[k]);
+  S.order = [...nums].sort((a, b) => a - b);
+  S.next = 0;
+
+  for (let i = 0; i < CONFIG.CELLS; i++) {
+    S.cellNum[i] ? setCell(i, 'shown pop', S.cellNum[i]) : setCell(i, 'empty');
+  }
+  S.phase = 'memo';
+  S.memoMs = memoMsFor(S.level);
+  S.memoStart = performance.now();
+  el.msg.textContent = 'おぼえて！';
+  el.msg.className = 'text-center h-8 font-extrabold text-lg text-amber-300';
+  el.sub.textContent = `${count}個 ／ 表示 ${(S.memoMs / 1000).toFixed(2)}秒`;
+  later(hideNumbers, S.memoMs);
+  updateHUD();
+}
+
+function hideNumbers() {
+  if (S.phase !== 'memo') return;
+  S.phase = 'input';
+  for (let i = 0; i < CONFIG.CELLS; i++) if (S.cellNum[i]) setCell(i, 'covered');
+  el.barMemo.style.width = '0%';
+  el.msg.textContent = '小さい順にタップ！';
+  el.msg.className = 'text-center h-8 font-extrabold text-lg text-indigo-200';
+}
+
+function onCell(i, btn) {
+  if (S.phase === 'memo' && S.cellNum[i]) { clearLater(); hideNumbers(); }
+  if (S.phase !== 'input') return;
+  const n = S.cellNum[i];
+  if (!n || btn.classList.contains('ok')) return;
+
+  if (n === S.order[S.next]) {
+    Sound.tap(S.next);
+    setCell(i, 'ok pop', n);
+    S.next++;
+    if (S.next === S.order.length) roundClear(btn);
+  } else {
+    miss(i, btn);
+  }
+}
+
+function roundClear(btn) {
+  S.phase = 'feedback';
+  const count = S.order.length;
+  S.combo++; S.maxCombo = Math.max(S.maxCombo, S.combo);
+  const gain = count * 10 + (S.combo - 1) * 5;
+  S.score += gain; S.clears++;
+  S.time = Math.min(CONFIG.TIME_CAP, S.time + CONFIG.CLEAR_BONUS_SEC);
+  S.history.push('🟩');
+  S.level++; S.maxLevel = Math.max(S.maxLevel, S.level);
+  Sound.clear();
+  el.msg.textContent = S.combo >= 3 ? `🔥 ${S.combo} COMBO!` : 'PERFECT!';
+  el.msg.className = 'text-center h-8 font-extrabold text-lg text-emerald-300 pop';
+  floatText(btn, `+${gain}`, '#6ee7b7');
+  floatText(el.time, `+${CONFIG.CLEAR_BONUS_SEC}s`, '#6ee7b7');
+  updateHUD();
+  later(startRound, 450);
+}
+
+function miss(i, btn) {
+  S.phase = 'feedback';
+  S.misses++; S.combo = 0;
+  S.time -= CONFIG.MISS_PENALTY_SEC;
+  S.history.push('🟥');
+  S.level = Math.max(1, S.level - 1);
+  Sound.error();
+  // 正解を見せる
+  for (let k = 0; k < CONFIG.CELLS; k++) {
+    const n = S.cellNum[k];
+    if (!n || cellEl(k).classList.contains('ok')) continue;
+    setCell(k, k === i ? 'ng' : 'answer', n);
+  }
+  el.board.classList.remove('shake'); void el.board.offsetWidth; el.board.classList.add('shake');
+  el.msg.textContent = `ざんねん… 次は ${S.order[S.next]}`;
+  el.msg.className = 'text-center h-8 font-extrabold text-lg text-rose-300';
+  floatText(el.time, `-${CONFIG.MISS_PENALTY_SEC}s`, '#fca5a5');
+  updateHUD();
+  if (S.time <= 0) return gameOver();
+  later(startRound, 1000);
+}
+
+function floatText(target, text, color) {
+  const app = $('app').getBoundingClientRect();
+  const r = target.getBoundingClientRect();
+  const f = document.createElement('div');
+  f.className = 'float num text-lg';
+  f.style.color = color;
+  f.style.left = (r.left - app.left + r.width / 2) + 'px';
+  f.style.top = (r.top - app.top - 6) + 'px';
+  f.textContent = text;
+  $('app').appendChild(f);
+  setTimeout(() => f.remove(), 900);
+}
+
+/* ---------- タイマー ---------- */
+function loop(now) {
+  if (S.phase === 'over') return;
+  const dt = (now - S.lastFrame) / 1000;
+  S.lastFrame = now;
+  S.time -= dt;
+  if (S.phase === 'memo') {
+    const p = Math.max(0, 1 - (now - S.memoStart) / S.memoMs);
+    el.barMemo.style.width = (p * 100) + '%';
+  }
+  const sec = Math.ceil(S.time);
+  if (S.time <= 5 && sec !== S.lastTickSec && sec > 0) { S.lastTickSec = sec; Sound.tick(); }
+  updateTime();
+  if (S.time <= 0) return gameOver();
+  rafId = requestAnimationFrame(loop);
+}
+function updateTime() {
+  const t = Math.max(0, S.time);
+  el.time.textContent = t.toFixed(1);
+  el.time.classList.toggle('low-time', t <= 10);
+  el.barTime.style.width = (t / CONFIG.TIME_CAP * 100) + '%';
+}
+function updateHUD() {
+  updateTime();
+  el.level.textContent = S.level;
+  el.combo.textContent = S.combo;
+  el.score.textContent = S.score;
+}
+
+/* ---------- 進行 ---------- */
+function startGame() {
+  Sound.init();
+  const name = ($('in-name').value || '').trim() || 'NO NAME';
+  Store.set('indieshorts_player_name', name);
+  resetState();
+  buildBoard();
+  updateHUD();
+  el.msg.textContent = ''; el.sub.textContent = '';
+  show('game');
+  runCountdown();
+}
+
+// 3-2-1 カウントダウン → 開始
+function runCountdown() {
+  S.phase = 'countdown';
+  el.cdLayer.style.display = 'flex';
+  let n = 3;
+  const step = () => {
+    if (n > 0) {
+      el.cdNum.textContent = n; Sound.count();
+    } else {
+      el.cdNum.textContent = 'GO!'; Sound.go();
+    }
+    el.cdNum.classList.remove('countdown'); void el.cdNum.offsetWidth; el.cdNum.classList.add('countdown');
+    if (n-- > 0) later(step, 700);
+    else later(() => {
+      el.cdLayer.style.display = 'none';
+      S.lastFrame = performance.now();
+      rafId = requestAnimationFrame(loop);
+      startRound();
+    }, 500);
+  };
+  step();
+}
+
+/* ---------- 一時停止（タブ切り替え・アプリ切り替え） ----------
+   裏に回ったら時間を止める。戻ってきたらタップで再開。
+   覚える途中（memo）や正誤表示中（feedback）だった場合は、
+   隠れている間に数字を見逃さないよう新しい問題から始める。 */
+function pauseGame() {
+  if (S.paused || !['countdown', 'memo', 'input', 'feedback'].includes(S.phase)) return;
+  S.paused = true;
+  cancelAnimationFrame(rafId); clearLater();
+  el.cdLayer.style.display = 'none';
+  if (S.phase === 'memo') {           // 隠れている間に数字が見えないよう伏せる
+    for (let i = 0; i < CONFIG.CELLS; i++) if (S.cellNum[i]) setCell(i, 'covered');
+    el.barMemo.style.width = '0%';
+  }
+  $('pause-layer').style.display = 'flex';
+}
+
+function resumeGame() {
+  if (!S.paused) return;
+  S.paused = false;
+  Sound.init();
+  $('pause-layer').style.display = 'none';
+  if (S.phase === 'countdown') return runCountdown();
+  S.lastFrame = performance.now();
+  rafId = requestAnimationFrame(loop);
+  if (S.phase === 'memo' || S.phase === 'feedback') startRound();
+}
+
+document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
+window.addEventListener('pagehide', pauseGame);
+$('pause-layer').addEventListener('pointerdown', e => { e.preventDefault(); resumeGame(); });
+
+function gameOver() {
+  if (S.phase === 'over') return;
+  S.phase = 'over';
+  S.time = 0; updateTime();
+  cancelAnimationFrame(rafId); clearLater();
+  Sound.timeup();
+
+  const name = Store.get('indieshorts_player_name', 'NO NAME');
+  const prevBest = Ranking.load().filter(r => r.name === name).reduce((m, r) => Math.max(m, r.score), 0);
+  Ranking.save({ name, score: S.score, level: S.maxLevel, date: Date.now() });
+  submitOnline(name, S.score, S.maxLevel);
+
+  const total = S.clears + S.misses;
+  const acc = total ? Math.round(S.clears / total * 100) : 0;
+  $('res-score').textContent = S.score;
+  $('res-level').textContent = S.maxLevel;
+  $('res-combo').textContent = S.maxCombo;
+  $('res-acc').textContent = acc + '%';
+  $('res-new').classList.toggle('hidden', !(S.score > prevBest && S.score > 0));
+  const emoji = emojiLine();
+  $('res-emoji').textContent = emoji || '—';
+
+  const text = `【Sort 9】スコア ${S.score} ／ 最高Lv.${S.maxLevel} ／ 最大${S.maxCombo}コンボ\n${emoji}\n#INDIESHORTS #Sort9`;
+  S.shareText = text;
+  $('btn-share').href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text);
+  $('copy-label').textContent = '結果をコピー';
+
+  setTimeout(() => show('result'), 900);
+}
+
+// プレイ履歴を絵文字で（最大20ラウンド、10個ごとに改行）
+function emojiLine() {
+  const h = S.history.length > 20 ? S.history.slice(-20) : S.history;
+  const rows = [];
+  for (let i = 0; i < h.length; i += 10) rows.push(h.slice(i, i + 10).join(''));
+  return (S.history.length > 20 ? '…' : '') + rows.join('\n');
+}
+
+// Firestore へ登録（未設定・0点・通信失敗時は何もしない／表示のみ）
+async function submitOnline(name, score, level) {
+  const st = $('res-online');
+  st.textContent = '';
+  if (!window.OnlineRanking || score <= 0) return;
+  st.textContent = 'ランキングに登録中…';
+  try {
+    await window.OnlineRanking.add({ name: name.slice(0, 12), score, level: Math.min(100, Math.max(1, level)) });
+    st.textContent = '全国ランキングに登録しました';
+  } catch (e) {
+    console.warn('ranking submit failed', e);
+    st.textContent = 'ランキング登録に失敗しました（端末には保存済み）';
+  }
+}
+
+let renderSeq = 0;
+async function renderRanking() {
+  const seq = ++renderSeq;
+  let list = Ranking.load(), src = 'この端末の記録';
+  if (window.OnlineRanking) {
+    try { list = await window.OnlineRanking.top(5); src = '全国ランキング'; }
+    catch (e) { console.warn('ranking load failed', e); src = 'この端末の記録（オフライン）'; }
+  }
+  if (seq !== renderSeq) return; // 古い読み込み結果は捨てる
+  $('rank-src').textContent = src;
+  const ol = $('rank-list');
+  if (!list.length) { ol.innerHTML = '<li class="text-slate-500 text-center py-2">まだ記録がありません</li>'; return; }
+  const medal = ['text-amber-300', 'text-slate-300', 'text-orange-400', 'text-slate-500', 'text-slate-500'];
+  ol.innerHTML = list.map((r, i) => `
+    <li class="flex items-center gap-3 rounded-lg bg-white/5 px-3 py-1.5">
+      <span class="num w-5 ${medal[i]}">${i + 1}</span>
+      <span class="flex-1 truncate">${escapeHtml(r.name)}</span>
+      <span class="text-[10px] text-slate-400">Lv.${r.level}</span>
+      <span class="num text-emerald-300 w-14 text-right">${r.score}</span>
+    </li>`).join('');
+}
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+/* ---------- イベント ---------- */
+$('btn-start').addEventListener('click', startGame);
+$('btn-retry').addEventListener('click', startGame);
+$('btn-home').addEventListener('click', () => { renderRanking(); show('title'); });
+$('btn-copy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(S.shareText || ''); $('copy-label').textContent = 'コピーしました！'; }
+  catch (e) { $('copy-label').textContent = 'コピーできませんでした'; }
+});
+$('in-name').value = Store.get('indieshorts_player_name', '');
+renderRanking();
+window.addEventListener('online-ranking-ready', renderRanking);
+</script>
+
+<!-- ===== Firebase / Firestore ランキング =====
+     Firebase コンソール → プロジェクトの設定 → マイアプリ（ウェブ）の firebaseConfig を貼り付ける。
+     apiKey が空のままなら、端末内ランキングだけで動く。 -->
+<script type="module">
+const firebaseConfig = {
+  apiKey: 'AIzaSyCL8QoW18MeVpcx96B-PhRp17NM_krAam0',
+  authDomain: 'sort9-6e880.firebaseapp.com',
+  projectId: 'sort9-6e880',
+  storageBucket: 'sort9-6e880.firebasestorage.app',
+  messagingSenderId: '36558741048',
+  appId: '1:36558741048:web:b264212dc7cc87956310cd',
+  measurementId: 'G-KZG3RXXTFH',
+};
+
+if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+  try {
+    const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+    const { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, serverTimestamp } =
+      await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+    const db = getFirestore(initializeApp(firebaseConfig));
+    const col = collection(db, 'sort9_rankings');
+    window.OnlineRanking = {
+      async top(n = 5) {
+        const snap = await getDocs(query(col, orderBy('score', 'desc'), limit(Math.min(n, 50))));
+        return snap.docs.map(d => d.data());
+      },
+      // ルールに合わせて name / score / level / timestamp の4項目だけ送る
+      add({ name, score, level }) {
+        return addDoc(col, { name, score, level, timestamp: serverTimestamp() });
+      },
+    };
+    window.dispatchEvent(new Event('online-ranking-ready'));
+  } catch (e) {
+    console.warn('Firebase init failed', e);
+  }
+}
+</script>
+</body>
+</html>
